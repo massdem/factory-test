@@ -1,0 +1,31 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: what is really checked out
+        run: |
+          echo "event=${{ github.event_name }} github.sha=${{ github.sha }} pr_head=${{ github.event.pull_request.head.sha }} pr_base=${{ github.event.pull_request.base.sha }}"
+          echo "HEAD=$(git rev-parse HEAD) TREE=$(git rev-parse 'HEAD^{tree}')"
+      - name: test
+        run: |
+          if [ -e SLOW ]; then sleep 90; else sleep 5; fi
+          if [ -e FAIL ]; then echo "FAILED tests/test_contract.py::test_flag - AssertionError: FAIL file present"; exit 1; fi
+  ci-aggregate:
+    runs-on: ubuntu-latest
+    needs: [unit]
+    if: always()
+    steps:
+      - name: every required job must have succeeded
+        run: |
+          echo "unit=${{ needs.unit.result }}"
+          [ "${{ needs.unit.result }}" = "success" ]
